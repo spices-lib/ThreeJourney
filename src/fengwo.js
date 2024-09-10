@@ -14,7 +14,6 @@ const gui = new dat.GUI()
 /**
  * @brief Function Library
  * */
-
 const functions = {
     durationTime : 2,
     animation: () => {
