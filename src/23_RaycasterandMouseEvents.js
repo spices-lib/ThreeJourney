@@ -1,7 +1,5 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 
 // Scene
 const scene = new THREE.Scene()
@@ -14,23 +12,10 @@ const directionalLight = new THREE.DirectionalLight(0x00ff00, 0.5)
 scene.add(directionalLight)
 
 // Models
-const dracoLoader = new DRACOLoader()
-dracoLoader.setDecoderPath('/draco/')
-
-const gltfLoader = new GLTFLoader()
-gltfLoader.setDRACOLoader(dracoLoader)
-
-let mixer = null
-gltfLoader.load(
-    '/models/rubbertoy.gltf',
-    (gltf) => {
-
-        mixer = new THREE.AnimationMixer(gltf.scene)
-        const action = mixer.clipAction(gltf.animations[0])
-        action.play()
-
-        scene.add(gltf.scene)
-    })
+const geometry = new THREE.BoxGeometry()
+const material = new THREE.MeshBasicMaterial({ color: 0xff0000 })
+const mesh = new THREE.Mesh(geometry, material)
+scene.add(mesh)
 
 // Raycaster
 const raycaster = new THREE.Raycaster()
@@ -66,8 +51,8 @@ const cursor = {
 }
 
 window.addEventListener('mousemove', (event) => {
-    cursor.x = event.clientX / sizes.width - 0.5
-    cursor.y = 0.5 - event.clientY / sizes.height
+    cursor.x = event.clientX / sizes.width * 2 - 1
+    cursor.y = 1 - 2 * event.clientY / sizes.height
 })
 
 window.addEventListener('resize', () => {
@@ -85,26 +70,34 @@ window.addEventListener('resize', () => {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
 })
 
-const clock = new THREE.Clock()
-let previousTime = 0
+window.addEventListener('click', () => {
+    
+})
+
+let currentIntersect = null
 
 // Animation
 const tick = () => {
 
-    const elapsedTime = clock.getElapsedTime()
-    const deltaTime = elapsedTime - previousTime
-    previousTime = elapsedTime
+    raycaster.setFromCamera(cursor, camera)
+    const intersects = raycaster.intersectObjects(mesh)
+    console.log(intersects)
 
-    const rayOriginal = new THREE.Vector3(-3, 0, 0)
-    const rayDirection = new THREE.Vector3(1, 0, 0)
-    rayDirection.normalize()
-    raycaster.set(rayOriginal, rayDirection)
-
-
-
-    // Update mix
-    if(mixer !== null) {
-        mixer.update(deltaTime)
+    if(intersects.length)
+    {
+        if(currentIntersect === null)
+        {
+            console.log('mouse enter')
+        }
+        currentIntersect = intersects[0]
+    }
+    else
+    {
+        if(currentIntersect)
+        {
+            console.log('mouse leave')
+        }
+        currentIntersect = null
     }
 
     // Update controls
