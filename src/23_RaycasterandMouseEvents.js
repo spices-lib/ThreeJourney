@@ -70,18 +70,21 @@ window.addEventListener('resize', () => {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
 })
 
-window.addEventListener('click', () => {
-    
-})
-
 let currentIntersect = null
+let objects = [mesh]
+
+window.addEventListener('click', () => {
+    if(currentIntersect)
+    {
+        console.log('click a mesh')
+    }
+})
 
 // Animation
 const tick = () => {
 
     raycaster.setFromCamera(cursor, camera)
-    const intersects = raycaster.intersectObjects(mesh)
-    console.log(intersects)
+    const intersects = raycaster.intersectObjects(objects)
 
     if(intersects.length)
     {
