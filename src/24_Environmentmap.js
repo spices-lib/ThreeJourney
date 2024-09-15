@@ -14,12 +14,19 @@ const scene = new THREE.Scene()
 
 // Lights
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.5)
+ambientLight.castShadow = true
 scene.add(ambientLight)
 
 const directionalLight = new THREE.DirectionalLight(0x00ff00, 0.5)
+directionalLight.castShadow = true
+directionalLight.shadow.camera.far = 15
+directionalLight.shadow.mapSize.set(1024, 1024)
+directionalLight.shadow.normalBias = 0.05
 scene.add(directionalLight)
 
-// textures
+/*************************************************************************************************/
+
+// textures0
 const textureLoader = new THREE.CubeTextureLoader()
 const texture = textureLoader.load([
     '/textures/Standard-Cube-Map/px.png',
@@ -29,6 +36,16 @@ const texture = textureLoader.load([
     '/textures/Standard-Cube-Map/pz.png',
     '/textures/Standard-Cube-Map/nz.png',
 ])
+scene.environment = texture
+scene.background = texture
+scene.backgroundBlurriness = 0.1
+scene.backgroundIntensity = 5
+
+/*************************************************************************************************/
+
+/*************************************************************************************************/
+
+// textures1
 const rgbetextureLoader = new RGBELoader()
 rgbetextureLoader.load('/textures/kloofendal_48d_partly_cloudy_puresky_4k.hdr', (map) => {
     map.mapping = THREE.EquirectangularReflectionMapping
@@ -43,16 +60,31 @@ rgbetextureLoader.load('/textures/kloofendal_48d_partly_cloudy_puresky_4k.hdr', 
     scene.add(skybox)
 })
 
-scene.environment = texture
-scene.background = texture
-scene.backgroundBlurriness = 0.1
-scene.backgroundIntensity = 5
+/*************************************************************************************************/
+
+/*************************************************************************************************/
+
+// Cube render target
+const cubeRenderTarget = new THREE.WebGLCubeRenderTarget(256, {
+    type: THREE.HalfFloatType
+})
+scene.environment = cubeRenderTarget.texture
+
+// Cube camera
+const cubeCamera = new THREE.CubeCamera(0.1, 100, cubeRenderTarget)
+cubeCamera.layers.set(1)
+
+/*************************************************************************************************/
+
 
 const updateAllMaterial = () => {
     scene.traverse((child) => {
         if(child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial)
         {
             child.material.envMapIntensity = global.envMapIntensity
+            child.material.needsUpdate = true
+            child.castShadow = true
+            child.receiveShadow = true
             gui.add(child.material, 'envMapIntensity').min(0).max(10).step(0.01)
         }
     })
@@ -97,10 +129,25 @@ scene.add(camera)
 // Renderer
 const canvas = document.querySelector(".ThreeJourney")
 const renderer = new THREE.WebGLRenderer({
-    canvas : canvas
+    canvas : canvas,
+    antialias: true    // 抗锯齿
 })
 renderer.setSize(sizes.width, sizes.height)
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+renderer.physicallyCorrectLights = true             // Physical Light range
+renderer.outputColorSpace = THREE.SRGBColorSpace    // Color Space
+renderer.toneMapping = THREE.ACESFilmicToneMapping  // Explore
+renderer.toneMappingExposure = 3
+renderer.shadowMap.type = THREE.PCFSoftShadowMap    // soft shadow
+
+gui.add(renderer, 'toneMapping', {
+    No: THREE.NoToneMapping,
+    Linear: THREE.LinearToneMapping,
+    Reinhard: THREE.ReinhardToneMapping,
+    Cineon: THREE.CineonToneMapping,
+    ACESFilmic: THREE.ACESFilmicToneMapping
+})
+gui.add(renderer, 'toneMappingExposure').min(0).max(10).step(0.01)
 
 // Controls
 const controls = new OrbitControls(camera, canvas)
@@ -150,6 +197,8 @@ const tick = () => {
     // Update controls
     // When use damp, controls must update
     controls.update()
+
+    cubeCamera.update(renderer, scene)
 
     // Render
     renderer.render(scene, camera)
