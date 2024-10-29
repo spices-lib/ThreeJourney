@@ -20,70 +20,7 @@ const smokeMaterial = new THREE.ShaderMaterial({
     transparent: true,
     uniforms: {
         uTime: new THREE.Uniform(0),
-        uPerlinTexture: new THREE.Uniform(perlinTexture)
-    },
-    vertexShader: `
-        varying vec2 vUv;
-    
-        uniform sampler2D uPerlinTexture;
-    
-        vec2 rotate2D(vec2 value, float angle)
-        {
-            float s = sin(angle);
-            float c = cos(angle);
-            mat2 m = mat2(c, s, -s, c);
-            return m * value;
-        }
-    
-        void main()
-        {
-            vec3 p = position;
-            
-            vec2 smokeUv = uv;
-            smokeUv.x *= 0.4;
-            smokeUv.y *= 0.2;
-            
-            float smoke = texture(uPerlinTexture, smokeUv).x;
-            float angle = position.y * smoke;
-            p.xz = rotate2D(p.xz, angle);
-            
-            vec2 windOffset = vec2(0.0f, 0.0f);
-            windOffset.y = position.y * smoke;
-            p.xz += windOffset;
-            
-            vec4 modelPosition = modelMatrix * vec4(p, 1.0f);
-            gl_Position = projectionMatrix * viewMatrix * modelPosition;
-            
-            vUv = uv;
-        }
-    `,
-    fragmentShader:`
-        varying vec2 vUv;
-        
-        uniform sampler2D uPerlinTexture;
-        uniform float uTime;
-
-        void main()
-        {
-            vec2 smokeUv = vUv;
-            smokeUv.x *= 0.4;
-            smokeUv.y *= 0.2;
-            smokeUv.y -= uTime * 0.03;
-        
-            float smoke = texture(uPerlinTexture, smokeUv).x;
-            
-            smoke  = smoothstep(0.4, 1.0, smoke);
-            smoke *= smoothstep(0.0, 0.1, vUv.x);
-            smoke *= smoothstep(1.0, 0.9, vUv.x);
-            smoke *= smoothstep(0.0, 0.1, vUv.y);
-            smoke *= smoothstep(1.0, 0.4, vUv.y);
-            
-            gl_FragColor = vec4(smoke, smoke, smoke, smoke);
-            
-            #include <tonemapping_fragment>
-            #include <colorspace_fragment>
-        }
-    `
+    }
 })
 
 const smoke = new THREE.Mesh(smokeGeometry, smokeMaterial)
