@@ -16,73 +16,114 @@ const sizes = {
     pixelRatio: Math.min(window.devicePixelRatio, 2),
 }
 
-// Particles
-const count = 100
-const positionArray = new Float32Array(count * count * 3)
-for(let i = 0; i < count; i++) {
-    for(let j = 0; j < count; j++) {
-        const i3 = i * 3;
+// Displacement
+const displacement = {}
+displacement.canvas = document.createElement('canvas')
+displacement.canvas.width = 128
+displacement.canvas.height = 128
+displacement.canvas.style.position = 'fixed'
+displacement.canvas.style.width = '256px'
+displacement.canvas.style.height = '256px'
+displacement.canvas.style.top = 0
+displacement.canvas.style.left = 0
+displacement.canvas.style.zIndex = 10
+document.body.append(displacement.canvas)
 
-        positionArray[i3] = position.x
-        positionArray[i3 + 1] = position.y
-        positionArray[i3 + 2] = position.z
-    }
+// Context
+displacement.context = displacement.canvas.getContext('2d')
+//displacement.context.fillStyle = 'red'
+displacement.context.fillRect(0, 0, displacement.canvas.width, displacement.canvas.height)
+
+// Glow image
+displacement.glowImage = new Image()
+displacement.glowImage.src = './textures/face_woman_hat_skin.jpg'
+window.setTimeout(()=>{
+    displacement.context.drawImage(displacement.glowImage, 20, 20, 32, 32)
+}, 1000)
+
+// Interactive plane
+displacement.interactivePlane = new THREE.Mesh(
+    new THREE.PlaneGeometry(10, 10),
+    new THREE.MeshBasicMaterial({color: 'red'})
+)
+displacement.interactivePlane.visible = false
+scene.add(displacement.interactivePlane)
+
+// Raycaster
+displacement.raycaster = new THREE.Raycaster()
+
+// Coordinates
+displacement.screenCursor = new THREE.Vector2(9999, 9999)
+displacement.canvasCursor = new THREE.Vector2(9999, 9999)
+
+// Texture
+displacement.texture = new THREE.CanvasTexture(displacement.canvas)
+
+
+const textureLoader = new THREE.TextureLoader()
+const texture = textureLoader.load('./textures/face_woman_hat_skin.jpg')
+
+// Particles
+const particleGeometry = new THREE.PlaneGeometry(10, 10, 128, 128)
+const intensitiesArray = new Float32Array(particleGeometry.attributes.position.count)
+for(let i = 0; i < particleGeometry.attributes.position.count; i++)
+{
+    intensitiesArray[i] = Math.random()
 }
-const geometry = new THREE.BufferGeometry()
-geometry.setAttribute('position', new THREE.Float32BufferAttribute(positionArray, 3))
+particleGeometry.setAttribute('aIntensity', new THREE.BufferAttribute(intensitiesArray, 1))
 
 const material = new THREE.ShaderMaterial({
+    uniforms: {
+        uResolution: new THREE.Uniform(new THREE.Vector2(sizes.width * sizes.pixelRatio, sizes.height * sizes.pixelRatio)),
+        uPictureTexture: new THREE.Uniform(texture),
+        uDisplacementTexture: new THREE.Uniform(displacement.texture)
+    },
     vertexShader: `
             
+            attribute float aIntensity;
+            
+            uniform vec2 uResolution;
+            uniform sampler2D uPictureTexture;
+            uniform sampler2D uDisplacementTexture;
+            
+            varying vec3 vColor;
+
             void main()
             {
-                float progress = uProgress * aTimeMultiplier;
                 vec3 p = position;
+                float displacementIntensity = texture(uDisplacementTexture, uv).r;
                 
-                // Exploding
-                float explodingProgress = remap(progress, 0.0, 0.1, 0.0, 1.0);
-                explodingProgress = clamp(explodingProgress, 0.0, 1.0);
-                explodingProgress = 1.0 - pow(1.0 - explodingProgress, 3.0);
-                p *= explodingProgress;
-                
-                // Falling
-                float fallingProgress = remap(progress, 0.1, 1.0, 0.0, 1.0);
-                fallingProgress = clamp(fallingProgress, 0.0, 1.0);
-                fallingProgress = 1.0 - pow(1.0 - fallingProgress, 3.0);
-                p.y -= fallingProgress * 0.2;
-                
-                // Scale
-                float sizeOpeningProgress = remap(progress, 0.0, 0.125, 0.0, 1.0);
-                float sizeClosingProgress = remap(progress, 0.125, 1.0, 1.0, 0.0);
-                float sizeProgress = min(sizeOpeningProgress, sizeClosingProgress);
-                sizeProgress = clamp(sizeProgress, 0.0, 1.0);
-                
-                // Twinkling
-                float twinklingProgress = remap(progress, 0.2, 0.8, 0.0, 1.0);
-                twinklingProgress = clamp(twinklingProgress, 0.0, 1.0);
-                float sizeTwinkling = sin(progress * 30.0) * 0.5 + 0.5;
-                sizeTwinkling = 1.0 - sizeTwinkling * twinklingProgress;
+                vec3 displacement = vec3(0.0, 0.0, 1.0);
+                displacement *= displacementIntensity;
+                p += displacement * 2.0 * aIntensity;
                 
                 vec4 modelPosition = modelMatrix * vec4(p, 1.0f);
                 vec4 viewPosition = viewMatrix * modelPosition;
                 gl_Position = projectionMatrix * viewPosition;
                 
-                gl_PointSize = uSize * uResolution.y * aSize * sizeProgress * sizeTwinkling;
+                float pictureIntensity = texture(uPictureTexture, uv).r;
+                
+                gl_PointSize = 0.05 * uResolution.y * pictureIntensity;
                 gl_PointSize *= 1.0 / -viewPosition.z;
                 
-                if(gl_PointSize < 1.0)
-                {
-                    gl_Position = vec4(9999.9);
-                }
+                vColor = vec3(pow(pictureIntensity, 2.0));
             }
         `,
     fragmentShader: `
 
-            uniform vec3 uColor;
+            varying vec3 vColor;
 
             void main()
             {
-                gl_FragColor = vec4(uColor, 1.0);
+                vec2 uv = gl_PointCoord;
+                float distanceToCenter = distance(uv, vec2(0.5));
+                
+                if(distanceToCenter > 0.5)
+                {
+                    discard;
+                }
+
+                gl_FragColor = vec4(1.0);
                 
                 #include <tonemapping_fragment>
                 #include <colorspace_fragment>
@@ -90,7 +131,7 @@ const material = new THREE.ShaderMaterial({
         `
 })
 
-const grid = new THREE.Points(geometry, material)
+const grid = new THREE.Points(particleGeometry, material)
 scene.add(grid)
 
 // Camera
@@ -124,6 +165,9 @@ window.addEventListener('resize', () => {
     sizes.height = window.innerHeight
     sizes.pixelRatio = Math.min(window.devicePixelRatio, 2)
 
+    // update material
+    material.uniforms.uResolution.value = new THREE.Vector2(sizes.width * sizes.pixelRatio, sizes.height * sizes.pixelRatio);
+
     // Update camera
     camera.aspect = sizes.width / sizes.height
     camera.updateProjectionMatrix()
@@ -133,12 +177,49 @@ window.addEventListener('resize', () => {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
 })
 
+window.addEventListener('pointermove', (event) => {
+    displacement.screenCursor.x = (event.clientX / sizes.width) * 2 - 1
+    displacement.screenCursor.y = -(event.clientY / sizes.height) * 2 + 1
+
+})
+
 // Animation
 const tick = () => {
 
     // Update controls
     // When use damp, controls must update
     controls.update()
+
+    // Raycaster
+    displacement.raycaster.setFromCamera(displacement.screenCursor, camera)
+    const intersections = displacement.raycaster.intersectObject(displacement.interactivePlane)
+
+    if(intersections.length)
+    {
+        const uv = intersections[0].uv
+        displacement.canvasCursor.x = uv.x * displacement.canvas.width
+        displacement.canvasCursor.y = (1 - uv.y) * displacement.canvas.height
+
+
+    }
+
+    // Displacement
+    displacement.context.globalCompositeOperation = 'source-over'
+    displacement.context.globalAlpha = 0.02
+    displacement.context.fillRect(0, 0, displacement.canvas.width, displacement.canvas.height)
+
+    const glowSize = displacement.canvas.width * 0.25
+    displacement.context.globalCompositeOperation = 'lighten'
+    displacement.context.globalAlpha = 1
+    displacement.context.drawImage(
+        displacement.glowImage,
+        displacement.canvasCursor.x - glowSize * 0.5,
+        displacement.canvasCursor.y - glowSize * 0.5,
+        glowSize,
+        glowSize
+    )
+
+    displacement.texture.needsUpdate = true
 
     // Render
     renderer.render(scene, camera)
