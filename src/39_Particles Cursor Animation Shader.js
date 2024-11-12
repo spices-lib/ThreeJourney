@@ -44,7 +44,7 @@ window.setTimeout(()=>{
 // Interactive plane
 displacement.interactivePlane = new THREE.Mesh(
     new THREE.PlaneGeometry(10, 10),
-    new THREE.MeshBasicMaterial({color: 'red'})
+    new THREE.MeshBasicMaterial({color: 'red', side: THREE.DoubleSide })
 )
 displacement.interactivePlane.visible = false
 scene.add(displacement.interactivePlane)
@@ -55,6 +55,7 @@ displacement.raycaster = new THREE.Raycaster()
 // Coordinates
 displacement.screenCursor = new THREE.Vector2(9999, 9999)
 displacement.canvasCursor = new THREE.Vector2(9999, 9999)
+displacement.canvasCursorPrevious = new THREE.Vector2(9999, 9999)
 
 // Texture
 displacement.texture = new THREE.CanvasTexture(displacement.canvas)
@@ -65,22 +66,29 @@ const texture = textureLoader.load('./textures/face_woman_hat_skin.jpg')
 
 // Particles
 const particleGeometry = new THREE.PlaneGeometry(10, 10, 128, 128)
+particleGeometry.setIndex(null)
+particleGeometry.deleteAttribute('normal')
 const intensitiesArray = new Float32Array(particleGeometry.attributes.position.count)
+const anglesArray = new Float32Array(particleGeometry.attributes.position.count)
+
 for(let i = 0; i < particleGeometry.attributes.position.count; i++)
 {
     intensitiesArray[i] = Math.random()
+    anglesArray[i] = Math.random() * Math.PI * 2
 }
 particleGeometry.setAttribute('aIntensity', new THREE.BufferAttribute(intensitiesArray, 1))
+particleGeometry.setAttribute('aAngle', new THREE.BufferAttribute(anglesArray, 1))
 
 const material = new THREE.ShaderMaterial({
     uniforms: {
         uResolution: new THREE.Uniform(new THREE.Vector2(sizes.width * sizes.pixelRatio, sizes.height * sizes.pixelRatio)),
         uPictureTexture: new THREE.Uniform(texture),
-        uDisplacementTexture: new THREE.Uniform(displacement.texture)
+        uDisplacementTexture: new THREE.Uniform(displacement.texture),
     },
     vertexShader: `
             
             attribute float aIntensity;
+            attribute float aAngle;
             
             uniform vec2 uResolution;
             uniform sampler2D uPictureTexture;
@@ -92,8 +100,10 @@ const material = new THREE.ShaderMaterial({
             {
                 vec3 p = position;
                 float displacementIntensity = texture(uDisplacementTexture, uv).r;
+                displacementIntensity = smoothstep(0.1, 1.0, displacementIntensity);
                 
-                vec3 displacement = vec3(0.0, 0.0, 1.0);
+                vec3 displacement = vec3(cos(aAngle), sin(aAngle), 1.0);
+                displacement = normalize(displacement);
                 displacement *= displacementIntensity;
                 p += displacement * 2.0 * aIntensity;
                 
@@ -199,8 +209,6 @@ const tick = () => {
         const uv = intersections[0].uv
         displacement.canvasCursor.x = uv.x * displacement.canvas.width
         displacement.canvasCursor.y = (1 - uv.y) * displacement.canvas.height
-
-
     }
 
     // Displacement
@@ -208,17 +216,25 @@ const tick = () => {
     displacement.context.globalAlpha = 0.02
     displacement.context.fillRect(0, 0, displacement.canvas.width, displacement.canvas.height)
 
-    const glowSize = displacement.canvas.width * 0.25
-    displacement.context.globalCompositeOperation = 'lighten'
-    displacement.context.globalAlpha = 1
-    displacement.context.drawImage(
-        displacement.glowImage,
-        displacement.canvasCursor.x - glowSize * 0.5,
-        displacement.canvasCursor.y - glowSize * 0.5,
-        glowSize,
-        glowSize
-    )
+    // Speed alpha
+    const cursorDistance = displacement.canvasCursorPrevious.distanceTo(displacement.canvasCursor)
+    displacement.canvasCursorPrevious.copy(displacement.canvasCursor)
+    const alpha = Math.min(cursorDistance * 0.1, 1)
 
+
+    if(intersections.length)
+    {
+        const glowSize = displacement.canvas.width * 0.25
+        displacement.context.globalCompositeOperation = 'lighten'
+        displacement.context.globalAlpha = alpha
+        displacement.context.drawImage(
+            displacement.glowImage,
+            displacement.canvasCursor.x - glowSize * 0.5,
+            displacement.canvasCursor.y - glowSize * 0.5,
+            glowSize,
+            glowSize
+        )
+    }
     displacement.texture.needsUpdate = true
 
     // Render
