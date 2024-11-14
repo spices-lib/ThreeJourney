@@ -75,9 +75,25 @@ gpgpu.debug = new THREE.Mesh(
 scene.add(gpgpu.debug)
 
 // Geometry
+const particlesUvArray = new Float32Array(baseGeometry.count * 2)
+for(let y = 0; y < gpgpu.size; y++)
+{
+    for(let x = 0; x < gpgpu.size; x++)
+    {
+        const i = (y * gpgpu.size) + x
+        const i2 = i * 2
+
+        const uvX = (x + 0.5) / gpgpu.size
+        const uvY = (y + 0.5) / gpgpu.size
+
+        particlesUvArray[i2 + 0] = uvX
+        particlesUvArray[i2 + 1] = uvY
+    }
+}
+
 const geometry = new THREE.BufferGeometry()
 geometry.setDrawRange(0, baseGeometry.count)
-
+geometry.setAttribute('aParticlesUv', new THREE.BufferAttribute(particlesUvArray, 2))
 const material = new THREE.ShaderMaterial({
     transparent: true,
     blending: THREE.AdditiveBlending,
@@ -89,18 +105,22 @@ const material = new THREE.ShaderMaterial({
     vertexShader: `
     
     attribute vec3 aTarget;
+    attribute vec2 aParticlesUv;
     
     uniform vec2 uResolution;
-    
+    uniform sampler2D uParticles;
 
     void main()
     {
-        vec3 p = position;
+        vec4 particle = texture(uParticles, aParticlesUv);
+    
+    
+        vec3 p = particle.xyz;
         vec4 modelPosition = modelMatrix * vec4(p, 1.0f);
         vec4 viewPosition = viewMatrix * modelPosition;
         gl_Position = projectionMatrix * viewPosition;
         
-        gl_PointSize = 0.02 * uResolution.y ;
+        gl_PointSize = 0.2 * uResolution.y ;
         gl_PointSize *= 1.0 / -viewPosition.z;
     }
     `,
