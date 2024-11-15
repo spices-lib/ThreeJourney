@@ -17,6 +17,20 @@ const material = new THREE.MeshStandardMaterial({
     color: '#858080'
 })
 
+const patchMap = {
+    csm_Slice: {
+        '#include <colorspace_fragment>':
+        `
+            #include <colorspace_fragment>
+            
+            if(!gl_FrontFacing)
+            {
+                gl_FragColor = vec4(0.75, 0.15, 0.3, 1.0);
+            }
+        `
+    }
+}
+
 const slicedMaterial = new CustomShaderMaterial({
 
     baseMaterial: THREE.MeshStandardMaterial,
@@ -37,12 +51,22 @@ const slicedMaterial = new CustomShaderMaterial({
             
             float angle = atan(vPosition.y, vPosition.x);
         
-            csm_FragColor = vec4(angle, angle, angle, 1.0);
+            if(angle > uSliceStart && angle < uSliceStart + uSliceArc)
+            {
+                discard;
+            }
+        
+            csm_FragColor = vec4(1.0);
+            
+            float csm_Slice;
+        
+            
         }
     `,
     metalness: 0.5,
     roughness: 0.25,
-    color: '#858080'
+    color: '#858080',
+    patchMap: patchMap.csm_Slice
 })
 
 const mesh = new THREE.Mesh(geometry, slicedMaterial)
