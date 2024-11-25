@@ -12,6 +12,7 @@ import {RGBShiftShader} from "three/addons";
 import {ShaderPass} from "three/addons";
 import {WebGLRenderer} from "three";
 import Stats from "three/addons/libs/stats.module.js";
+import {gsap} from 'gsap'
 
 // Stats
 const stats = new Stats();
@@ -23,6 +24,33 @@ const gui = new dat.GUI()
 
 // Scene
 const scene = new THREE.Scene()
+
+// Overlay
+const overlayGeometry = new THREE.PlaneGeometry(2, 2, 1)
+const overlayMaterial = new THREE.ShaderMaterial({
+    transparent: true,
+    uniforms: {
+        uAlpha: {value: 1.0}
+    },
+    vertexShader: `
+        void main()
+        {
+            vec3 p = position;
+            vec4 modelPosition = modelMatrix * vec4(p, 1.0f);
+            gl_Position = modelPosition;
+        }
+    `,
+    fragmentShader: `
+        uniform float uAlpha;
+    
+        void main()
+        {
+            gl_FragColor = vec4(0.0, 0.0, 0.0, uAlpha);
+        }
+    `
+})
+const overlay = new THREE.Mesh(overlayGeometry, overlayMaterial)
+scene.add(overlay)
 
 // Lights
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.5)
@@ -38,8 +66,20 @@ scene.add(directionalLight)
 
 /*************************************************************************************************/
 
+const loadingBar = document.querySelector('.loading-bar')
+
+const loadingManager = new THREE.LoadingManager(
+    ()=>{
+        gsap.to(overlayMaterial.uniforms.uAlpha, { duration: 3, value: 0})
+    },
+    (itemUrl, itemsLoaded, itemsTotal) => {
+        const progressRatio = itemsLoaded / itemsTotal
+        loadingBar.style.transform = 'scaleX(0.5)'
+    }
+)
+
 // textures0
-const textureLoader = new THREE.CubeTextureLoader()
+const textureLoader = new THREE.CubeTextureLoader(loadingManager)
 const texture = textureLoader.load([
     '/textures/Standard-Cube-Map/px.png',
     '/textures/Standard-Cube-Map/nx.png',
@@ -110,7 +150,7 @@ gui.add(global, 'envMapIntensity').min(0).max(10).step(0.01).onChange(updateAllM
 const dracoLoader = new DRACOLoader()
 dracoLoader.setDecoderPath('/draco/')
 
-const gltfLoader = new GLTFLoader()
+const gltfLoader = new GLTFLoader(loadingManager)
 gltfLoader.setDRACOLoader(dracoLoader)
 
 let mixer = null
