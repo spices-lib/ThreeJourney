@@ -71,10 +71,11 @@ const loadingBar = document.querySelector('.loading-bar')
 const loadingManager = new THREE.LoadingManager(
     ()=>{
         gsap.to(overlayMaterial.uniforms.uAlpha, { duration: 3, value: 0})
+        loadingBar.classList.add('ended')
     },
     (itemUrl, itemsLoaded, itemsTotal) => {
         const progressRatio = itemsLoaded / itemsTotal
-        loadingBar.style.transform = 'scaleX(0.5)'
+        loadingBar.style.transform = `scaleX(${progressRatio})`
     }
 )
 
