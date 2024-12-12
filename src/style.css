@@ -34,6 +34,7 @@ body
     transform: scaleX(0);
     transform-origin: top left;
     transition: transform 0.5s;
+    will-change: transform;
 }
 
 .loading-bar.ended
@@ -41,4 +42,28 @@ body
     transform: scaleX(0);
     transform-origin: top right;
     transition: transform 1.5s ease-in-out;
+}
+
+.point
+{
+    position: absolute;
+    top: 50%;
+    left: 50%;
+}
+
+.point.label
+{
+    position: absolute;
+    top: -20px;
+    left: -20px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #ff0000;
+
+}
+
+.point.text
+{
+    display: none;
 }

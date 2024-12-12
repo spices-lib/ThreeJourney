@@ -70,8 +70,16 @@ const loadingBar = document.querySelector('.loading-bar')
 
 const loadingManager = new THREE.LoadingManager(
     ()=>{
-        gsap.to(overlayMaterial.uniforms.uAlpha, { duration: 3, value: 0})
-        loadingBar.classList.add('ended')
+
+        // same to window timeout
+        gsap.delayedCall(0.5, ()=>{
+
+        })
+        window.setTimeout(() => {
+            gsap.to(overlayMaterial.uniforms.uAlpha, { duration: 3, value: 0})
+            loadingBar.classList.add('ended')
+            loadingBar.style.transform = ''
+        }, 500)
     },
     (itemUrl, itemsLoaded, itemsTotal) => {
         const progressRatio = itemsLoaded / itemsTotal
